@@ -14,7 +14,7 @@
       "dev.realistictreephysics.RealisticTreePhysicsMod"
     ]
   },
-  "environment": "server",
+  "environment": "*",
   "id": "realistic-tree-physics",
   "license": "All Rights Reserved",
   "name": "Realistic Tree Physics",
