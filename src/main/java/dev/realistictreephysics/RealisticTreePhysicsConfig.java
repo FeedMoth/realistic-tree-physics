@@ -29,6 +29,11 @@ public final class RealisticTreePhysicsConfig {
     public int minLeaves = 3;
     public int minSpan = 3;
     public int maxBlocks = 256;
+    // Large trees: off by default, because a big canopy is a lot of
+    // falling blocks and a touching forest can merge into one fall.
+    // Turn this on to raise the cap to 4096 blocks instead of
+    // maxBlocks. maxBlocks still applies when this is off.
+    public boolean allowLargeTrees = false;
     public int tipTicks = 20;
     public int bounceTicks = 6;
     public boolean groundDrop = true;

@@ -29,13 +29,18 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * - A tree needs a vertical log span of at least 3, at least 3 logs
  *   in total, and at least 3 leaves. Without leaves it is treated as
  *   a player-built structure and left alone.
- * - Hard cap of 256 blocks (logs + leaves). Over the cap the whole
- *   detection aborts and nothing is removed.
+ * - Cap of maxBlocks blocks (logs + leaves, default 256), or 4096
+ *   when allowLargeTrees is on. Over the cap the whole detection
+ *   aborts and nothing is removed.
  */
 public final class TreeDetector {
     public static final int MAX_BLOCKS = 256;
+    public static final int LARGE_TREE_MAX_BLOCKS = 4096;
 
     private static int maxBlocks() {
+        if (RealisticTreePhysicsConfig.get().allowLargeTrees) {
+            return LARGE_TREE_MAX_BLOCKS;
+        }
         return Math.max(1, RealisticTreePhysicsConfig.get().maxBlocks);
     }
 
