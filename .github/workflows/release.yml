@@ -28,6 +28,9 @@ jobs:
         run: |
           JAR=$(ls build/libs/realistic-tree-physics-*.jar | grep -v -e '-sources.jar' -e '-dev.jar' | head -1)
           MC=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2)
+          VER=$(grep '^version=' gradle.properties | cut -d'=' -f2)
+          TARGET="realistic-tree-physics-${VER}+${MC}.jar"
+          if [ "$(basename "$JAR")" != "$TARGET" ]; then cp "$JAR" "build/libs/$TARGET"; JAR="build/libs/$TARGET"; fi
           echo "Releasing $JAR for Minecraft $MC"
           # Grouped releases: one tag per Minecraft family (for
           # example v1.1.0-26.x) holds every jar in that family.
