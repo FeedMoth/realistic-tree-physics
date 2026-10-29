@@ -1,0 +1,33 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: build
+        run: ./gradlew build
+      - name: create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          JAR=$(ls build/libs/realistic-tree-physics-*.jar | grep -v -e '-sources.jar' -e '-dev.jar' | head -1)
+          MC=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2)
+          echo "Releasing $JAR for Minecraft $MC"
+          gh release delete "${{ github.ref_name }}" -y || true
+          gh release create "${{ github.ref_name }}" "$JAR" --title "Realistic Tree Physics ${{ github.ref_name }}" --notes "Realistic Tree Physics ${{ github.ref_name }} for Minecraft $MC (Fabric)."

@@ -1,0 +1,23 @@
+{
+  "authors": [
+    "FeedMoth"
+  ],
+  "depends": {
+    "fabric-api": "*",
+    "fabricloader": ">=0.20.1",
+    "java": ">=25",
+    "minecraft": "~26.3"
+  },
+  "description": "Transform tree harvesting in Minecraft with dynamic, physics-based timber animations. Chop down trees and watch them fall naturally with realistic weight and motion\u2014all managed seamlessly on the server side.",
+  "entrypoints": {
+    "main": [
+      "dev.realistictreephysics.RealisticTreePhysicsMod"
+    ]
+  },
+  "environment": "server",
+  "id": "realistic-tree-physics",
+  "license": "All Rights Reserved",
+  "name": "Realistic Tree Physics",
+  "schemaVersion": 1,
+  "version": "${version}"
+}
