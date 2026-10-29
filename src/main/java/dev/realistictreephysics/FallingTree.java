@@ -11,7 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Display;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -111,7 +111,7 @@ public class FallingTree {
             double s = vx * fallX + vz * fallZ;
             double p = vx * acrossX + vz * acrossZ;
             double u = vy;
-            Display.BlockDisplay display = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, level);
+            Display.BlockDisplay display = new Display.BlockDisplay(EntityType.BLOCK_DISPLAY, level);
             DisplayHelper.setBlockState(display, state);
             display.addTag(TAG);
             display.setPos(pos.getX(), pos.getY(), pos.getZ());
