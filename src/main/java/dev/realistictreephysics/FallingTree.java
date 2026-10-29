@@ -51,6 +51,11 @@ import org.joml.Vector3f;
  * they would break instead of placing. Blocks that would clip
  * into uphill ground drop as items instead of overwriting it.
  * The settle step never overwrites a solid non-tree block.
+ * Decorative blocks are the exception: tall grass, flowers,
+ * mushrooms and the like are not solid, so they never count as
+ * ground and never push a falling block up. A falling block
+ * landing on one breaks it (dropping its normal loot) and
+ * takes its cell.
  */
 public class FallingTree {
     public static final String TAG = "realistic-tree-physics";
@@ -225,9 +230,17 @@ public class FallingTree {
             }
             BlockState existing = level.getBlockState(target);
             if (!existing.isAir() && !tree.blocks().containsKey(target)) {
-                // Never overwrite solid terrain or a build.
-                dropAsItem(entry.getValue(), target);
-                continue;
+                if (existing.isSolid()) {
+                    // Never overwrite solid terrain or a build.
+                    dropAsItem(entry.getValue(), target);
+                    continue;
+                }
+                // Not solid: tall grass, flowers, mushrooms, torches,
+                // snow and the like. Break it and take its cell, with
+                // its normal drops (a flower drops itself, tall grass
+                // drops nothing, and so on). Fluids drop nothing and
+                // are simply replaced by the placed block.
+                Block.dropResources(existing, level, target);
             }
             level.setBlock(target, entry.getValue(), 3);
             placedTargets.add(target);
@@ -243,17 +256,20 @@ public class FallingTree {
      * from its rotated position for the closest solid block below
      * it: terrain, a stump, a build, or a block already placed by
      * this fall. The block lands directly on top of that solid.
-     * Falling blocks have already been removed from the world, so
-     * anything solid found is not part of this fall, except blocks
-     * placed earlier in this same settle. If no solid is found
-     * within 64 blocks, the block stays at its rotated height.
+     * Only a solid block counts as ground: tall grass, flowers,
+     * mushrooms and other decorative blocks are ignored, so they
+     * never push a falling block up a block. Falling blocks have
+     * already been removed from the world, so anything solid found
+     * is not part of this fall, except blocks placed earlier in
+     * this same settle. If no solid is found within 64 blocks,
+     * the block stays at its rotated height.
      */
     private int landingY(BlockPos target, java.util.Set<BlockPos> placedTargets) {
         int minY = level.dimensionType().minY();
         int floor = Math.max(minY, target.getY() - 64);
         for (int y = target.getY() - 1; y >= floor; y--) {
             BlockPos below = new BlockPos(target.getX(), y, target.getZ());
-            if (placedTargets.contains(below) || !level.getBlockState(below).isAir()) {
+            if (placedTargets.contains(below) || level.getBlockState(below).isSolid()) {
                 return y + 1;
             }
         }
