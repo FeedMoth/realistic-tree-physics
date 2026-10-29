@@ -59,11 +59,11 @@ public final class TreeDetector {
     }
 
     public static boolean isLog(BlockState state) {
-        return state.is(BlockTags.LOGS);
+        return state.isIn(BlockTags.LOGS);
     }
 
     public static boolean isLeaf(BlockState state) {
-        return state.is(BlockTags.LEAVES);
+        return state.isIn(BlockTags.LEAVES);
     }
 
     public static Tree detect(ServerWorld level, BlockPos seedPos) {
@@ -72,13 +72,13 @@ public final class TreeDetector {
 
         BlockState seedState = level.getBlockState(seedPos);
         if (isLog(seedState)) {
-            queue.add(seedPos.immutable());
+            queue.add(seedPos);
         } else {
             // Player-break case: the broken log is already air. Seed
             // from any neighbouring log instead.
             for (BlockPos neighbour : neighbours26(seedPos)) {
                 if (isLog(level.getBlockState(neighbour))) {
-                    queue.add(neighbour.immutable());
+                    queue.add(neighbour);
                 }
             }
         }
@@ -96,7 +96,7 @@ public final class TreeDetector {
             }
             for (BlockPos neighbour : neighbours26(pos)) {
                 if (!logs.contains(neighbour) && isLog(level.getBlockState(neighbour))) {
-                    queue.add(neighbour.immutable());
+                    queue.add(neighbour);
                 }
             }
         }
@@ -107,8 +107,8 @@ public final class TreeDetector {
         for (BlockPos log : logs) {
             for (Direction dir : Direction.values()) {
                 BlockPos neighbour = log.offset(dir);
-                if (isLeaf(level.getBlockState(neighbour)) && leaves.add(neighbour.immutable())) {
-                    leafQueue.add(neighbour.immutable());
+                if (isLeaf(level.getBlockState(neighbour)) && leaves.add(neighbour)) {
+                    leafQueue.add(neighbour);
                 }
             }
         }
@@ -118,8 +118,8 @@ public final class TreeDetector {
                 BlockPos neighbour = pos.offset(dir);
                 if (!leaves.contains(neighbour) && !logs.contains(neighbour)
                         && isLeaf(level.getBlockState(neighbour))) {
-                    leaves.add(neighbour.immutable());
-                    leafQueue.add(neighbour.immutable());
+                    leaves.add(neighbour);
+                    leafQueue.add(neighbour);
                 }
             }
             if (logs.size() + leaves.size() > maxBlocks()) {
@@ -182,7 +182,7 @@ public final class TreeDetector {
             blocks.put(leaf, level.getBlockState(leaf));
         }
         return new Tree(Map.copyOf(blocks), fallingLogs.size(), fallingLeaves.size(),
-                seedPos.immutable(), stumpLogCount);
+                seedPos, stumpLogCount);
     }
 
     private static Iterable<BlockPos> neighbours26(BlockPos pos) {
@@ -193,7 +193,7 @@ public final class TreeDetector {
                     if (dx == 0 && dy == 0 && dz == 0) {
                         continue;
                     }
-                    out.add(pos.offset(dx, dy, dz));
+                    out.add(pos.add(dx, dy, dz));
                 }
             }
         }
