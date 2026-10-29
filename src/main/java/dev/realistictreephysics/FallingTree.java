@@ -1,21 +1,21 @@
 package dev.realistictreephysics;
 
-import com.mojang.math.Transformation;
+import net.minecraft.util.math.AffineTransformation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.Display;
-import net.minecraft.world.entity.EntityTypes;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.entity.decoration.DisplayEntity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import org.joml.AxisAngle4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -64,7 +64,7 @@ public class FallingTree {
     private final int bounceTicks;
     private final int totalTicks;
 
-    private final ServerLevel level;
+    private final ServerWorld level;
     private final TreeDetector.Tree tree;
     private final Direction fall;
     private final double pivotX;
@@ -78,10 +78,10 @@ public class FallingTree {
     private int tick = 0;
     private boolean settled = false;
 
-    private record AnimatedBlock(Display display, BlockPos original, BlockState state, double s, double u, double p) {
+    private record AnimatedBlock(DisplayEntity display, BlockPos original, BlockState state, double s, double u, double p) {
     }
 
-    public FallingTree(ServerLevel level, TreeDetector.Tree tree, Direction fall) {
+    public FallingTree(ServerWorld level, TreeDetector.Tree tree, Direction fall) {
         this.level = level;
         this.tree = tree;
         this.fall = fall;
@@ -96,8 +96,8 @@ public class FallingTree {
         this.pivotX = tree.pivot().getX() + 0.5;
         this.pivotY = tree.pivot().getY() + 0.5;
         this.pivotZ = tree.pivot().getZ() + 0.5;
-        this.fallX = fall.getStepX();
-        this.fallZ = fall.getStepZ();
+        this.fallX = fall.getOffsetX();
+        this.fallZ = fall.getOffsetZ();
         // Across axis: rotate fall by 90 degrees horizontally.
         this.acrossX = -fallZ;
         this.acrossZ = fallX;
@@ -111,13 +111,13 @@ public class FallingTree {
             double s = vx * fallX + vz * fallZ;
             double p = vx * acrossX + vz * acrossZ;
             double u = vy;
-            Display.BlockDisplay display = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, level);
+            DisplayEntity.BlockDisplayEntity display = new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, level);
             DisplayHelper.setBlockState(display, state);
-            display.addTag(TAG);
-            display.setPos(pos.getX(), pos.getY(), pos.getZ());
-            DisplayHelper.setTransformation(display, new Transformation(
+            display.addCommandTag(TAG);
+            display.setPosition(pos.getX(), pos.getY(), pos.getZ());
+            DisplayHelper.setTransformation(display, new AffineTransformation(
                     new Vector3f(0, 0, 0), new Quaternionf(), new Vector3f(1, 1, 1), new Quaternionf()));
-            level.addFreshEntity(display);
+            level.spawnEntity(display);
             displays.add(new AnimatedBlock(display, pos, state, s, u, p));
         }
     }
@@ -157,7 +157,7 @@ public class FallingTree {
         double axisZ = 0.0 - 1.0 * fallX;
         // up (0,1,0) x fall (fallX,0,fallZ) = (fallZ, 0, -fallX)
         Quaternionf rotation = new Quaternionf(new AxisAngle4f((float) theta, (float) axisX, (float) axisY, (float) axisZ));
-        Transformation transformation = new Transformation(
+        AffineTransformation transformation = new AffineTransformation(
                 new Vector3f(0, 0, 0), rotation, new Vector3f(1, 1, 1), new Quaternionf());
         for (AnimatedBlock block : displays) {
             double sPrime = block.s() * cos + block.u() * sin;
@@ -165,7 +165,7 @@ public class FallingTree {
             double worldX = pivotX + sPrime * fallX + block.p() * acrossX;
             double worldY = pivotY + uPrime;
             double worldZ = pivotZ + sPrime * fallZ + block.p() * acrossZ;
-            block.display().setPos(worldX, worldY, worldZ);
+            block.display().setPosition(worldX, worldY, worldZ);
             DisplayHelper.setTransformation(block.display(), transformation);
         }
     }
@@ -220,7 +220,7 @@ public class FallingTree {
             if (RealisticTreePhysicsConfig.get().groundDrop) {
                 target = new BlockPos(target.getX(), landingY(target, placedTargets), target.getZ());
             }
-            if (target.getY() < level.dimensionType().minY()) {
+            if (target.getY() < level.getBottomY()) {
                 dropAsItem(entry.getValue(), entry.getKey());
                 continue;
             }
@@ -240,13 +240,13 @@ public class FallingTree {
                 // its normal drops (a flower drops itself, tall grass
                 // drops nothing, and so on). Fluids drop nothing and
                 // are simply replaced by the placed block.
-                Block.dropResources(existing, level, target);
+                Block.dropStacks(existing, level, target);
             }
-            level.setBlock(target, entry.getValue(), 3);
+            level.setBlockState(target, entry.getValue(), 3);
             placedTargets.add(target);
             placed++;
         }
-        level.playSound(null, tree.pivot(), SoundEvents.WOOD_BREAK, SoundSource.BLOCKS, 1.0f, 0.8f);
+        level.playSound(null, tree.pivot(), SoundEvents.BLOCK_WOOD_BREAK, SoundCategory.BLOCKS, 1.0f, 0.8f);
         RealisticTreePhysicsMod.LOGGER.info("[Realistic Tree Physics] fall settled at {} facing {} with {} blocks placed",
                 tree.pivot(), fall, placed);
     }
@@ -265,7 +265,7 @@ public class FallingTree {
      * the block stays at its rotated height.
      */
     private int landingY(BlockPos target, java.util.Set<BlockPos> placedTargets) {
-        int minY = level.dimensionType().minY();
+        int minY = level.getBottomY();
         int floor = Math.max(minY, target.getY() - 64);
         for (int y = target.getY() - 1; y >= floor; y--) {
             BlockPos below = new BlockPos(target.getX(), y, target.getZ());
@@ -288,6 +288,6 @@ public class FallingTree {
             return;
         }
         ItemEntity item = new ItemEntity(level, at.getX() + 0.5, at.getY() + 0.5, at.getZ() + 0.5, stack);
-        level.addFreshEntity(item);
+        level.spawnEntity(item);
     }
 }

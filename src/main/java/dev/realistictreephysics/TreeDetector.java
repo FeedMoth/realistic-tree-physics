@@ -6,13 +6,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.state.property.Properties;
 
 /**
  * Tree detection, written from scratch for this mod.
@@ -66,7 +66,7 @@ public final class TreeDetector {
         return state.is(BlockTags.LEAVES);
     }
 
-    public static Tree detect(ServerLevel level, BlockPos seedPos) {
+    public static Tree detect(ServerWorld level, BlockPos seedPos) {
         Set<BlockPos> logs = new HashSet<>();
         Queue<BlockPos> queue = new ArrayDeque<>();
 
@@ -106,7 +106,7 @@ public final class TreeDetector {
         Queue<BlockPos> leafQueue = new ArrayDeque<>();
         for (BlockPos log : logs) {
             for (Direction dir : Direction.values()) {
-                BlockPos neighbour = log.relative(dir);
+                BlockPos neighbour = log.offset(dir);
                 if (isLeaf(level.getBlockState(neighbour)) && leaves.add(neighbour.immutable())) {
                     leafQueue.add(neighbour.immutable());
                 }
@@ -115,7 +115,7 @@ public final class TreeDetector {
         while (!leafQueue.isEmpty()) {
             BlockPos pos = leafQueue.remove();
             for (Direction dir : Direction.values()) {
-                BlockPos neighbour = pos.relative(dir);
+                BlockPos neighbour = pos.offset(dir);
                 if (!leaves.contains(neighbour) && !logs.contains(neighbour)
                         && isLeaf(level.getBlockState(neighbour))) {
                     leaves.add(neighbour.immutable());
@@ -208,10 +208,10 @@ public final class TreeDetector {
      * Leaves have no axis and are returned unchanged.
      */
     public static BlockState remapAxisForFall(BlockState state, Direction fall) {
-        if (!state.hasProperty(BlockStateProperties.AXIS)) {
+        if (!state.contains(Properties.AXIS)) {
             return state;
         }
-        Direction.Axis axis = state.getValue(BlockStateProperties.AXIS);
+        Direction.Axis axis = state.get(Properties.AXIS);
         Direction.Axis fallAxis = fall.getAxis();
         Direction.Axis acrossAxis = fallAxis == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
         Direction.Axis result = switch (axis) {
@@ -228,6 +228,6 @@ public final class TreeDetector {
         if (result == axis) {
             return state;
         }
-        return state.setValue(BlockStateProperties.AXIS, result);
+        return state.with(Properties.AXIS, result);
     }
 }

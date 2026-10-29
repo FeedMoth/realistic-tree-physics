@@ -9,17 +9,18 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
-import net.minecraft.commands.Commands;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.ItemTags;
-import net.minecraft.world.entity.Display;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.text.Text;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.registry.tag.ItemTags;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.decoration.DisplayEntity;
+import net.minecraft.world.World;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,10 +56,10 @@ public class RealisticTreePhysicsMod implements ModInitializer {
         // (e.g. a server stop mid-fall). Their blocks are already gone
         // from the world, so this only clears the visual leftovers.
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            for (ServerLevel level : server.getAllLevels()) {
-                for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
-                    if (entity instanceof Display display
-                            && display.entityTags().contains(FallingTree.TAG)) {
+            for (ServerWorld level : server.getWorlds()) {
+                for (Entity entity : level.iterateEntities()) {
+                    if (entity instanceof DisplayEntity display
+                            && display.getCommandTags().contains(FallingTree.TAG)) {
                         display.discard();
                     }
                 }
@@ -70,10 +71,10 @@ public class RealisticTreePhysicsMod implements ModInitializer {
         // the tree is what tips over. If detection aborts, the rest of
         // the tree simply stays standing (vanilla behaviour).
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-            if (!(world instanceof ServerLevel level)) {
+            if (!(world instanceof ServerWorld level)) {
                 return;
             }
-            if (!(player instanceof ServerPlayer serverPlayer)) {
+            if (!(player instanceof ServerPlayerEntity serverPlayer)) {
                 return;
             }
             if (serverPlayer.isSpectator()) {
@@ -85,10 +86,10 @@ public class RealisticTreePhysicsMod implements ModInitializer {
             // vanilla single-block breaking applies instead. This
             // applies to any log break while sneaking, not just the
             // base log.
-            if (RealisticTreePhysicsConfig.get().sneakOptOut && serverPlayer.isShiftKeyDown()) {
+            if (RealisticTreePhysicsConfig.get().sneakOptOut && serverPlayer.isSneaking()) {
                 return;
             }
-            if (RealisticTreePhysicsConfig.get().requireAxe && !serverPlayer.getMainHandItem().is(ItemTags.AXES)) {
+            if (RealisticTreePhysicsConfig.get().requireAxe && !serverPlayer.getMainHandStack().isIn(ItemTags.AXES)) {
                 return;
             }
             if (!RealisticTreePhysicsConfig.get().enabled) {
@@ -97,7 +98,7 @@ public class RealisticTreePhysicsMod implements ModInitializer {
             if (!TreeDetector.isLog(state)) {
                 return;
             }
-            Direction facing = serverPlayer.getDirection();
+            Direction facing = serverPlayer.getHorizontalFacing();
             if (facing.getAxis() == Direction.Axis.Y) {
                 facing = Direction.NORTH;
             }
@@ -137,13 +138,13 @@ public class RealisticTreePhysicsMod implements ModInitializer {
         // checks. That is the one real griefing hole in the 1.0.1
         // build, and it must not ship in a public release.
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(Commands.literal("realistic-tree-physics")
-                    .requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
-                    .then(Commands.literal("broken")
-                    .then(Commands.argument("x", IntegerArgumentType.integer())
-                    .then(Commands.argument("y", IntegerArgumentType.integer())
-                    .then(Commands.argument("z", IntegerArgumentType.integer())
-                    .then(Commands.argument("direction", StringArgumentType.word())
+            dispatcher.register(CommandManager.literal("realistic-tree-physics")
+                    .requires(source -> source.hasPermissionLevel(2))
+                    .then(CommandManager.literal("broken")
+                    .then(CommandManager.argument("x", IntegerArgumentType.integer())
+                    .then(CommandManager.argument("y", IntegerArgumentType.integer())
+                    .then(CommandManager.argument("z", IntegerArgumentType.integer())
+                    .then(CommandManager.argument("direction", StringArgumentType.word())
                     .executes(context -> {
                         BlockPos target = new BlockPos(
                                 IntegerArgumentType.getInteger(context, "x"),
@@ -156,56 +157,56 @@ public class RealisticTreePhysicsMod implements ModInitializer {
                             case "west" -> Direction.WEST;
                             default -> Direction.NORTH;
                         };
-                        Level level = context.getSource().getLevel();
-                        if (!(level instanceof ServerLevel serverLevel)) {
-                            context.getSource().sendFailure(
-                                    Component.literal("Only a player can use /realistic-tree-physics broken"));
+                        World level = context.getSource().getWorld();
+                        if (!(level instanceof ServerWorld serverLevel)) {
+                            context.getSource().sendError(
+                                    Text.literal("Only a player can use /realistic-tree-physics broken"));
                             return 0;
                         }
                         if (startFall(serverLevel, target, facing)) {
-                            context.getSource().sendSuccess(
-                                    () -> Component.literal("Realistic Tree Physics: tree at " + target + " is falling"),
+                            context.getSource().sendFeedback(
+                                    () -> Text.literal("Realistic Tree Physics: tree at " + target + " is falling"),
                                     false);
                             return 1;
                         }
-                        context.getSource().sendFailure(
-                                Component.literal("Realistic Tree Physics: no valid tree at " + target));
+                        context.getSource().sendError(
+                                Text.literal("Realistic Tree Physics: no valid tree at " + target));
                         return 0;
                     }))))))
-                    .then(Commands.literal("look")
+                    .then(CommandManager.literal("look")
                             .executes(context -> {
-                                if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                                    context.getSource().sendFailure(
-                                            Component.literal("Only a player can use /realistic-tree-physics look"));
+                                if (!(context.getSource().getEntity() instanceof ServerPlayerEntity player)) {
+                                    context.getSource().sendError(
+                                            Text.literal("Only a player can use /realistic-tree-physics look"));
                                     return 0;
                                 }
-                                HitResult hit = player.pick(12.0, 0.0f, false);
+                                HitResult hit = player.raycast(12.0, 0.0f, false);
                                 if (!(hit instanceof BlockHitResult blockHit)
                                         || hit.getType() != HitResult.Type.BLOCK) {
-                                    context.getSource().sendFailure(
-                                            Component.literal("Not looking at a block"));
+                                    context.getSource().sendError(
+                                            Text.literal("Not looking at a block"));
                                     return 0;
                                 }
                                 BlockPos target = blockHit.getBlockPos();
-                                Direction facing = player.getDirection();
+                                Direction facing = player.getHorizontalFacing();
                                 if (facing.getAxis() == Direction.Axis.Y) {
                                     facing = Direction.NORTH;
                                 }
-                                if (startFall(player.level(), target, facing)) {
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal("Realistic Tree Physics: tree at " + target + " is falling"),
+                                if (startFall(player.getServerWorld(), target, facing)) {
+                                    context.getSource().sendFeedback(
+                                            () -> Text.literal("Realistic Tree Physics: tree at " + target + " is falling"),
                                             false);
                                     return 1;
                                 }
-                                context.getSource().sendFailure(
-                                        Component.literal("Realistic Tree Physics: no valid tree at " + target));
+                                context.getSource().sendError(
+                                        Text.literal("Realistic Tree Physics: no valid tree at " + target));
                                 return 0;
                             }))
-                    .then(Commands.literal("at")
-                            .then(Commands.argument("x", IntegerArgumentType.integer())
-                            .then(Commands.argument("y", IntegerArgumentType.integer())
-                            .then(Commands.argument("z", IntegerArgumentType.integer())
-                            .then(Commands.argument("direction", StringArgumentType.word())
+                    .then(CommandManager.literal("at")
+                            .then(CommandManager.argument("x", IntegerArgumentType.integer())
+                            .then(CommandManager.argument("y", IntegerArgumentType.integer())
+                            .then(CommandManager.argument("z", IntegerArgumentType.integer())
+                            .then(CommandManager.argument("direction", StringArgumentType.word())
                             .executes(context -> {
                                 BlockPos target = new BlockPos(
                                         IntegerArgumentType.getInteger(context, "x"),
@@ -218,20 +219,20 @@ public class RealisticTreePhysicsMod implements ModInitializer {
                                     case "west" -> Direction.WEST;
                                     default -> Direction.NORTH;
                                 };
-                                Level level = context.getSource().getLevel();
-                                if (!(level instanceof ServerLevel serverLevel)) {
-                                    context.getSource().sendFailure(
-                                            Component.literal("Not a server level"));
+                                World level = context.getSource().getWorld();
+                                if (!(level instanceof ServerWorld serverLevel)) {
+                                    context.getSource().sendError(
+                                            Text.literal("Not a server level"));
                                     return 0;
                                 }
                                 if (startFall(serverLevel, target, facing)) {
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal("Realistic Tree Physics: tree at " + target + " is falling"),
+                                    context.getSource().sendFeedback(
+                                            () -> Text.literal("Realistic Tree Physics: tree at " + target + " is falling"),
                                             false);
                                     return 1;
                                 }
-                                context.getSource().sendFailure(
-                                        Component.literal("Realistic Tree Physics: no valid tree at " + target));
+                                context.getSource().sendError(
+                                        Text.literal("Realistic Tree Physics: no valid tree at " + target));
                                 return 0;
                             })))))));
         });
@@ -247,7 +248,7 @@ public class RealisticTreePhysicsMod implements ModInitializer {
      * of the fall, without dropping an item, matching the player case
      * where that block's normal drop already happened).
      */
-    public static boolean startFall(ServerLevel level, BlockPos brokenOrTarget, Direction facing) {
+    public static boolean startFall(ServerWorld level, BlockPos brokenOrTarget, Direction facing) {
         TreeDetector.Tree tree = TreeDetector.detect(level, brokenOrTarget);
         if (tree == null) {
             return false;
@@ -258,7 +259,7 @@ public class RealisticTreePhysicsMod implements ModInitializer {
         // event. Blocks at or below the chop (the stump) are not in
         // tree.blocks() and are left exactly where they are.
         for (BlockPos pos : tree.blocks().keySet()) {
-            level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            level.setBlockState(pos, net.minecraft.block.Blocks.AIR.getDefaultState(), 3);
         }
         // For /realistic-tree-physics at / look, the target log itself is still
         // present and sits at the chop height, so it is part of the
@@ -266,7 +267,7 @@ public class RealisticTreePhysicsMod implements ModInitializer {
         // player break exactly; for a real player break it is
         // already air and this is a no-op.
         if (TreeDetector.isLog(level.getBlockState(brokenOrTarget))) {
-            level.setBlock(brokenOrTarget, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            level.setBlockState(brokenOrTarget, net.minecraft.block.Blocks.AIR.getDefaultState(), 3);
         }
         FallingTree fall = new FallingTree(level, tree, facing);
         ACTIVE.add(fall);
