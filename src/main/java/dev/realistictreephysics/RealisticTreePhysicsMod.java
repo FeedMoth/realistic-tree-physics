@@ -139,7 +139,7 @@ public class RealisticTreePhysicsMod implements ModInitializer {
         // build, and it must not ship in a public release.
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(CommandManager.literal("realistic-tree-physics")
-                    .requires(source -> source.getEntity() == null || (source.getEntity() instanceof ServerPlayerEntity opPlayer && source.getServer().getPlayerManager().isOperator(opPlayer.getGameProfile())))
+                    .requires(source -> source.getEntity() == null || (source.getEntity() instanceof ServerPlayerEntity opPlayer && source.getServer().getPlayerManager().isOperator(new net.minecraft.server.PlayerConfigEntry(opPlayer.getGameProfile()))))
                     .then(CommandManager.literal("broken")
                     .then(CommandManager.argument("x", IntegerArgumentType.integer())
                     .then(CommandManager.argument("y", IntegerArgumentType.integer())
@@ -192,7 +192,7 @@ public class RealisticTreePhysicsMod implements ModInitializer {
                                 if (facing.getAxis() == Direction.Axis.Y) {
                                     facing = Direction.NORTH;
                                 }
-                                if (startFall((ServerWorld) player.getWorld(), target, facing)) {
+                                if (startFall((ServerWorld) player.getEntityWorld(), target, facing)) {
                                     context.getSource().sendFeedback(
                                             () -> Text.literal("Realistic Tree Physics: tree at " + target + " is falling"),
                                             false);
