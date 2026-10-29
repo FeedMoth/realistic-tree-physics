@@ -1,0 +1,30 @@
+name: debug-build
+on:
+  push:
+    tags:
+      - 'debug-1201'
+permissions:
+  contents: write
+jobs:
+  debug-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'microsoft'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: build with log
+        run: |
+          ./gradlew build --stacktrace > build.log 2>&1; echo "exit=$?" >> build.log
+      - name: upload log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create debug-1201 build.log --title "debug-1201" --notes "debug log" 2>/dev/null || gh release upload debug-1201 build.log --clobber
