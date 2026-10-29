@@ -14,10 +14,14 @@ import org.joml.Vector3f;
  * In 1.21 the display data tracker fields are private, so this
  * helper obtains them once via reflection and then only uses
  * public DataTracker.set() calls, the same mechanism the game
- * itself uses to send display state to clients. If Mojang
- * renames those fields in a later version, this helper reports
- * unavailable and falls still settle correctly (the animation
- * simply becomes invisible, because the displays default to air).
+ * itself uses to send display state to clients. The field names
+ * below are the runtime (intermediary) names, not the Yarn
+ * names: string literals are not remapped at build time, so
+ * Yarn names fail at runtime with NoSuchFieldException. If
+ * Mojang renames those fields in a later version, this helper
+ * reports unavailable and falls still settle correctly (the
+ * animation simply becomes invisible, because the displays
+ * default to air).
  */
 public final class DisplayHelper {
     private static TrackedData<BlockState> blockStateAccessor;
@@ -34,15 +38,15 @@ public final class DisplayHelper {
     public static void init() {
         try {
             blockStateAccessor = (TrackedData<BlockState>) field(
-                    DisplayEntity.BlockDisplayEntity.class, "BLOCK_STATE");
+                    DisplayEntity.BlockDisplayEntity.class, "field_42416");
             translationAccessor = (TrackedData<Vector3f>) field(
-                    DisplayEntity.class, "TRANSLATION");
+                    DisplayEntity.class, "field_42401");
             scaleAccessor = (TrackedData<Vector3f>) field(
-                    DisplayEntity.class, "SCALE");
+                    DisplayEntity.class, "field_42402");
             leftRotationAccessor = (TrackedData<Quaternionf>) field(
-                    DisplayEntity.class, "LEFT_ROTATION");
+                    DisplayEntity.class, "field_42403");
             rightRotationAccessor = (TrackedData<Quaternionf>) field(
-                    DisplayEntity.class, "RIGHT_ROTATION");
+                    DisplayEntity.class, "field_42367");
             available = true;
             RealisticTreePhysicsMod.LOGGER.info("[Realistic Tree Physics] display helper ready");
         } catch (Exception e) {
